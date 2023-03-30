@@ -44,11 +44,10 @@ async def animate_spaceship(canvas, row, column, rocket_frames):
                 else max(column_borders)
 
 
-async def blink(canvas, row, column, symbol='*'):
+async def blink(canvas, row, column, symbol, offset_tics):
     while True:
         canvas.addstr(row, column, symbol, curses.A_DIM)
-        artificial_delay = randint(0, 15)
-        for _ in range(artificial_delay):
+        for _ in range(offset_tics):
             await Sleep(TIC_TIMEOUT)
 
         canvas.addstr(row, column, symbol, curses.A_DIM)
@@ -118,7 +117,7 @@ def draw(canvas, path_to_frames_dir):
 
     stars_coroutines = [blink(canvas, randint(2, display_width - 2),
                         randint(2, display_height - 2),
-                        symbol=choice('+*.:')) for _ in range(200)]
+                        choice('+*.:'), randint(0, 15)) for _ in range(200)]
     spaceship_coroutine = animate_spaceship(canvas, row_borders[1] / 2,
                                             column_borders[1] / 3,
                                             rocket_frames)
