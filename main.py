@@ -115,24 +115,23 @@ def draw(canvas, path_to_frames_dir):
     row_borders = (1, display_width - ship_width - 1)
     column_borders = (1, display_height - ship_height - 1)
 
-    stars_coroutines = [blink(canvas, randint(2, display_width - 2),
+    coroutines = [blink(canvas, randint(2, display_width - 2),
                         randint(2, display_height - 2),
                         choice('+*.:'), randint(0, 15)) for _ in range(200)]
-    spaceship_coroutine = animate_spaceship(canvas, row_borders[1] / 2,
-                                            column_borders[1] / 3,
-                                            rocket_frames)
-    shot_coroutine = fire(canvas, display_width - 2, display_height / 2)
+    coroutines.append(animate_spaceship(canvas, row_borders[1] / 2,
+                                        column_borders[1] / 3,
+                                        rocket_frames))
+    coroutines.append(fire(canvas, display_width - 2, display_height / 2))
     while True:
         try:
-            for star_coroutine in stars_coroutines:
+            for star_coroutine in coroutines.copy():
                 sleep_command = star_coroutine.send(None)
                 time_delay = sleep_command.seconds
             time.sleep(time_delay)
-            spaceship_coroutine.send(None)
-            shot_coroutine.send(None)   # Имитация непрерывных выстрелов
         except StopIteration:
-            shot_coroutine = fire(canvas, display_width - 2,
-                                  display_height / 2)
+            coroutines.pop()
+            coroutines.append(fire(canvas, display_width - 2,
+                                   display_height / 2))
             continue
 
 
