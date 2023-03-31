@@ -15,7 +15,6 @@ TIC_TIMEOUT = 0.1
 async def animate_spaceship(canvas, row, column, rocket_frames):
     for rocket_frame in cycle(rocket_frames):
         draw_frame(canvas, row, column, rocket_frame)
-        
         await asyncio.sleep(0)
 
         draw_frame(canvas, row, column, rocket_frame, negative=True)
@@ -97,15 +96,30 @@ def draw(canvas, path_to_frames_dir):
 
     global row_borders
     global column_borders
-    row_borders = (1, display_width - ship_width - 1)
-    column_borders = (1, display_height - ship_height - 1)
-
-    coroutines = [blink(canvas, randint(2, display_width - 2),
-                        randint(2, display_height - 2),
-                        choice('+*.:'), randint(0, 15)) for _ in range(200)]
-    coroutines.append(animate_spaceship(canvas, row_borders[1] / 2,
-                                        column_borders[1] / 3,
-                                        rocket_frames))
+    step_from_edge = 1
+    row_borders = (step_from_edge, display_width - ship_width - step_from_edge)
+    column_borders = (step_from_edge,
+                      display_height - ship_height - step_from_edge)
+    step_from_border = 2
+    max_offset_tics = 15
+    coroutines = [
+        blink(
+            canvas=canvas,
+            row=randint(step_from_border, display_width - step_from_border),
+            column=randint(step_from_border,
+                           display_height - step_from_border),
+            symbol=choice('+*.:'),
+            offset_tics=randint(0, max_offset_tics),
+              ) for _ in range(200)
+    ]
+    coroutines.append(
+        animate_spaceship(
+            canvas=canvas,
+            row=row_borders[1] / 2,
+            column=column_borders[1] / 3,
+            rocket_frames=rocket_frames
+                          )
+    )
     coroutines.append(fire(canvas, display_width - 2, display_height / 2))
     while True:
         for coroutine in coroutines.copy():
