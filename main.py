@@ -27,7 +27,7 @@ async def animate_spaceship(canvas, row, column, rocket_frames):
     for rocket_frame in cycle(rocket_frames):
         draw_frame(canvas, row, column, rocket_frame)
         canvas.refresh()
-        await Sleep(0)
+        await Sleep(TIC_TIMEOUT)
 
         draw_frame(canvas, row, column, rocket_frame, negative=True)
         rows_direction, columns_direction,\
@@ -123,16 +123,14 @@ def draw(canvas, path_to_frames_dir):
                                         rocket_frames))
     coroutines.append(fire(canvas, display_width - 2, display_height / 2))
     while True:
-        try:
-            for star_coroutine in coroutines.copy():
-                sleep_command = star_coroutine.send(None)
+        for coroutine in coroutines.copy():
+            try:
+                sleep_command = coroutine.send(None)
                 time_delay = sleep_command.seconds
-            time.sleep(time_delay)
-        except StopIteration:
-            coroutines.pop()
-            coroutines.append(fire(canvas, display_width - 2,
-                                   display_height / 2))
-            continue
+            except StopIteration:
+                coroutines.remove(coroutine)
+                continue
+        time.sleep(time_delay)
 
 
 def main():
