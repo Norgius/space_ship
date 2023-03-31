@@ -7,6 +7,8 @@ from itertools import cycle
 from random import randint, choice
 from functools import partial
 
+from environs import Env
+
 from curses_tools import draw_frame, read_controls, get_frame_size
 
 TIC_TIMEOUT = 0.1
@@ -87,7 +89,7 @@ async def fire(canvas, start_row, start_column,
         column += columns_speed
 
 
-def draw(canvas, path_to_frames_dir):
+def draw(canvas, path_to_frames_dir, stars_number):
     curses.curs_set(False)
     canvas.border()
     canvas.nodelay(True)
@@ -101,20 +103,21 @@ def draw(canvas, path_to_frames_dir):
     global row_borders
     global column_borders
     step_from_edge = 1
+    max_offset_tics = 15
+
     row_borders = (step_from_edge, display_width - ship_width - step_from_edge)
     column_borders = (step_from_edge,
                       display_height - ship_height - step_from_edge)
-    step_from_border = 2
-    max_offset_tics = 15
     coroutines = [
         blink(
             canvas=canvas,
-            row=randint(step_from_border, display_width - step_from_border),
-            column=randint(step_from_border,
-                           display_height - step_from_border),
+            row=randint(step_from_edge * 2,
+                        display_width - step_from_edge * 2),
+            column=randint(step_from_edge * 2,
+                           display_height - step_from_edge * 2),
             symbol=choice('+*.:'),
             offset_tics=randint(0, max_offset_tics),
-              ) for _ in range(200)
+              ) for _ in range(stars_number)
     ]
     coroutines.append(
         animate_spaceship(
@@ -124,7 +127,9 @@ def draw(canvas, path_to_frames_dir):
             rocket_frames=rocket_frames
                           )
     )
-    coroutines.append(fire(canvas, display_width - 2, display_height / 2))
+    coroutines.append(
+        fire(canvas, display_width - step_from_edge * 2, display_height / 2)
+    )
     while True:
         for coroutine in coroutines.copy():
             try:
@@ -137,6 +142,9 @@ def draw(canvas, path_to_frames_dir):
 
 
 def main():
+    env = Env()
+    env.read_env()
+    stars_number = env.int('STARS_NUMBER', 200)
     parser = argparse.ArgumentParser(
         description='Укажите путь к директории с макетами ракеты'
     )
@@ -144,7 +152,12 @@ def main():
                         help='Путь до директории')
     args = parser.parse_args()
     curses.update_lines_cols()
-    curses.wrapper(partial(draw, path_to_frames_dir=args.path))
+    curses.wrapper(partial(
+        draw,
+        path_to_frames_dir=args.path,
+        stars_number=stars_number
+                           )
+                   )
 
 
 if __name__ == '__main__':
