@@ -14,18 +14,22 @@ TIC_TIMEOUT = 0.1
 
 async def animate_spaceship(canvas, row, column, rocket_frames):
     for rocket_frame in cycle(rocket_frames):
-        draw_frame(canvas, row, column, rocket_frame)
-        await asyncio.sleep(0)
+        for _ in range(2):
+            draw_frame(canvas, row, column, rocket_frame)
+            await asyncio.sleep(0)
 
-        draw_frame(canvas, row, column, rocket_frame, negative=True)
-        rows_direction, columns_direction,\
-            space_pressed = read_controls(canvas)
-        if rows_direction or columns_direction:
-            row += rows_direction
-            row = min(max(row_borders), max(min(row_borders), row))
+            draw_frame(canvas, row, column, rocket_frame, negative=True)
+            rows_direction, columns_direction,\
+                space_pressed = read_controls(canvas)
+            if rows_direction or columns_direction:
+                row += rows_direction
+                row = min(max(row_borders), max(min(row_borders), row))
 
-            column += columns_direction
-            column = min(max(column_borders), max(min(column_borders), column))
+                column += columns_direction
+                column = min(
+                    max(column_borders),
+                    max(min(column_borders), column)
+                )
 
 
 async def blink(canvas, row, column, symbol, offset_tics):
