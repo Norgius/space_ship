@@ -134,10 +134,10 @@ def draw(canvas, path_to_frames_dir, stars_number):
         for coroutine in coroutines.copy():
             try:
                 coroutine.send(None)
-                canvas.refresh()
             except StopIteration:
                 coroutines.remove(coroutine)
                 continue
+        canvas.refresh()
         time.sleep(TIC_TIMEOUT)
 
 
