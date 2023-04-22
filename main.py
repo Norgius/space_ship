@@ -30,6 +30,9 @@ async def animate_spaceship(canvas, row, column, rocket_frames):
             )
             row += row_speed
             column += column_speed
+            
+            if space_pressed:
+                coroutines.append(fire(canvas, row, column + 2))
 
             row = min(max(row_borders), max(min(row_borders), row))
             column = min(
