@@ -9,26 +9,30 @@ from functools import partial
 
 from environs import Env
 
+from physics import update_speed
 from curses_tools import draw_frame, read_controls, get_frame_size
 
 TIC_TIMEOUT = 0.1
 
 
 async def animate_spaceship(canvas, row, column, rocket_frames):
+    row_speed, column_speed = 0, 0
     for rocket_frame in cycle(rocket_frames):
         for _ in range(2):
             draw_frame(canvas, row, column, rocket_frame)
-            await asyncio.sleep(0)
+            await sleep()
 
             draw_frame(canvas, row, column, rocket_frame, negative=True)
             rows_direction, columns_direction,\
                 space_pressed = read_controls(canvas)
-            if rows_direction or columns_direction:
-                row += rows_direction
-                row = min(max(row_borders), max(min(row_borders), row))
+            row_speed, column_speed = update_speed(
+                row_speed, column_speed, rows_direction, columns_direction
+            )
+            row += row_speed
+            column += column_speed
 
-                column += columns_direction
-                column = min(
+            row = min(max(row_borders), max(min(row_borders), row))
+            column = min(
                     max(column_borders),
                     max(min(column_borders), column)
                 )
@@ -37,24 +41,19 @@ async def animate_spaceship(canvas, row, column, rocket_frames):
 async def blink(canvas, row, column, symbol, offset_tics):
     while True:
         canvas.addstr(row, column, symbol, curses.A_DIM)
-        for _ in range(offset_tics):
-            await asyncio.sleep(0)
+        await sleep(offset_tics)
 
         canvas.addstr(row, column, symbol, curses.A_DIM)
-        for _ in range(20):
-            await asyncio.sleep(0)
+        await sleep(20)
 
         canvas.addstr(row, column, symbol)
-        for _ in range(3):
-            await asyncio.sleep(0)
+        await sleep(3)
 
         canvas.addstr(row, column, symbol, curses.A_BOLD)
-        for _ in range(5):
-            await asyncio.sleep(0)
+        await sleep(5)
 
         canvas.addstr(row, column, symbol)
-        for _ in range(3):
-            await asyncio.sleep(0)
+        await sleep(3)
 
 
 async def fire(canvas, start_row, start_column,
@@ -64,10 +63,10 @@ async def fire(canvas, start_row, start_column,
     row, column = start_row, start_column
 
     canvas.addstr(round(row), round(column), '*')
-    await asyncio.sleep(0)
+    await sleep()
 
     canvas.addstr(round(row), round(column), 'O')
-    await asyncio.sleep(0)
+    await sleep()
 
     canvas.addstr(round(row), round(column), ' ')
 
@@ -83,10 +82,41 @@ async def fire(canvas, start_row, start_column,
 
     while 0 < row < max_row and 0 < column < max_column:
         canvas.addstr(round(row), round(column), symbol)
-        await asyncio.sleep(0)
+        await sleep()
         canvas.addstr(round(row), round(column), ' ')
         row += rows_speed
         column += columns_speed
+
+
+async def fly_garbage(canvas, column, garbage_frame, speed=0.5):
+    """Animate garbage, flying from top to bottom. Сolumn position will stay same, as specified on start."""
+    rows_number, columns_number = canvas.getmaxyx()
+
+    column = max(column, 0)
+    column = min(column, columns_number - 1)
+
+    row = 0
+
+    while row < rows_number:
+        draw_frame(canvas, row, column, garbage_frame)
+        await sleep()
+        draw_frame(canvas, row, column, garbage_frame, negative=True)
+        row += speed
+
+
+async def fill_orbit_with_garbage(canvas, display_height):
+    garbage = os.listdir('garbage')
+    while True:
+        with open(os.path.join('garbage', choice(garbage)), "r") as garbage_file:
+            frame = garbage_file.read()
+        garbage_coord = randint(0, display_height)
+        coroutines.append(fly_garbage(canvas, column=garbage_coord, garbage_frame=frame))
+        await sleep(5)
+
+
+async def sleep(tics=1):
+    for _ in range(tics):
+        await asyncio.sleep(0)
 
 
 def draw(canvas, path_to_frames_dir, stars_number):
@@ -108,6 +138,8 @@ def draw(canvas, path_to_frames_dir, stars_number):
     row_borders = (step_from_edge, display_width - ship_width - step_from_edge)
     column_borders = (step_from_edge,
                       display_height - ship_height - step_from_edge)
+
+    global coroutines
     coroutines = [
         blink(
             canvas=canvas,
@@ -130,6 +162,7 @@ def draw(canvas, path_to_frames_dir, stars_number):
     coroutines.append(
         fire(canvas, display_width - step_from_edge * 2, display_height / 2)
     )
+    coroutines.append(fill_orbit_with_garbage(canvas, display_height))
     while True:
         for coroutine in coroutines.copy():
             try:
@@ -137,6 +170,7 @@ def draw(canvas, path_to_frames_dir, stars_number):
             except StopIteration:
                 coroutines.remove(coroutine)
                 continue
+
         canvas.refresh()
         time.sleep(TIC_TIMEOUT)
 
