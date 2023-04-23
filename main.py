@@ -10,6 +10,7 @@ from functools import partial
 from environs import Env
 
 from physics import update_speed
+from obstacles import Obstacle, show_obstacles
 from curses_tools import draw_frame, read_controls, get_frame_size
 
 TIC_TIMEOUT = 0.1
@@ -30,7 +31,7 @@ async def animate_spaceship(canvas, row, column, rocket_frames):
             )
             row += row_speed
             column += column_speed
-            
+
             if space_pressed:
                 coroutines.append(fire(canvas, row, column + 2))
 
@@ -99,12 +100,20 @@ async def fly_garbage(canvas, column, garbage_frame, speed=0.5):
     column = min(column, columns_number - 1)
 
     row = 0
+    rows_size, columns_size = get_frame_size(garbage_frame)
 
-    while row < rows_number:
-        draw_frame(canvas, row, column, garbage_frame)
-        await sleep()
-        draw_frame(canvas, row, column, garbage_frame, negative=True)
-        row += speed
+    obstacle = Obstacle(row, column, rows_size, columns_size)
+    obstacles.append(obstacle)
+
+    try:
+        while row < rows_number:
+            draw_frame(canvas, row, column, garbage_frame)
+            obstacle.row = row
+            await sleep()
+            draw_frame(canvas, row, column, garbage_frame, negative=True)
+            row += speed
+    finally:
+        obstacles.remove(obstacle)
 
 
 async def fill_orbit_with_garbage(canvas, display_height):
@@ -143,6 +152,9 @@ def draw(canvas, path_to_frames_dir, stars_number):
                       display_height - ship_height - step_from_edge)
 
     global coroutines
+    global obstacles
+    obstacles = []
+
     coroutines = [
         blink(
             canvas=canvas,
@@ -162,10 +174,9 @@ def draw(canvas, path_to_frames_dir, stars_number):
             rocket_frames=rocket_frames
                           )
     )
-    coroutines.append(
-        fire(canvas, display_width - step_from_edge * 2, display_height / 2)
-    )
     coroutines.append(fill_orbit_with_garbage(canvas, display_height))
+    coroutines.append(show_obstacles(canvas, obstacles))
+    
     while True:
         for coroutine in coroutines.copy():
             try:
