@@ -9,6 +9,7 @@ from functools import partial
 
 from environs import Env
 
+from explosion import explode
 from physics import update_speed
 from obstacles import Obstacle, show_obstacles
 from curses_tools import draw_frame, read_controls, get_frame_size
@@ -61,7 +62,7 @@ async def blink(canvas, row, column, symbol, offset_tics):
 
 
 async def fire(canvas, start_row, start_column,
-               rows_speed=-0.3, columns_speed=0):
+               rows_speed=-2.5, columns_speed=0):
     """Display animation of gun shot, direction and speed can be specified."""
 
     row, column = start_row, start_column
@@ -90,9 +91,13 @@ async def fire(canvas, start_row, start_column,
         canvas.addstr(round(row), round(column), ' ')
         row += rows_speed
         column += columns_speed
+        for obstacle in obstacles:
+            if obstacle.has_collision(row, column):
+                obstacles_in_last_collisions.append(obstacle)
+                return
 
 
-async def fly_garbage(canvas, column, garbage_frame, speed=0.5):
+async def fly_garbage(canvas, column, garbage_frame, speed=0.2):
     """Animate garbage, flying from top to bottom. Сolumn position will stay same, as specified on start."""
     rows_number, columns_number = canvas.getmaxyx()
 
@@ -112,6 +117,13 @@ async def fly_garbage(canvas, column, garbage_frame, speed=0.5):
             await sleep()
             draw_frame(canvas, row, column, garbage_frame, negative=True)
             row += speed
+            if obstacle in obstacles_in_last_collisions:
+                explosion_row = obstacle.row + obstacle.rows_size / 2
+                explosion_column = obstacle.column + obstacle.columns_size / 2
+                coroutines.append(
+                    explode(canvas, explosion_row, explosion_column)
+                )
+                break
     finally:
         obstacles.remove(obstacle)
 
@@ -153,7 +165,8 @@ def draw(canvas, path_to_frames_dir, stars_number):
 
     global coroutines
     global obstacles
-    obstacles = []
+    global obstacles_in_last_collisions
+    obstacles, obstacles_in_last_collisions = [], []
 
     coroutines = [
         blink(
@@ -176,7 +189,7 @@ def draw(canvas, path_to_frames_dir, stars_number):
     )
     coroutines.append(fill_orbit_with_garbage(canvas, display_height))
     coroutines.append(show_obstacles(canvas, obstacles))
-    
+
     while True:
         for coroutine in coroutines.copy():
             try:
