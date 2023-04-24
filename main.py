@@ -42,6 +42,15 @@ async def animate_spaceship(canvas, row, column, rocket_frames):
                     max(min(column_borders), column)
                 )
 
+            for obstacle in obstacles:
+                if obstacle.has_collision(
+                        row, column, ship_width, ship_height):
+                    coroutines.append(
+                        show_gameover(canvas, row_borders[1] / 2,
+                                      column_borders[1] / 3)
+                    )
+                    return
+
 
 async def blink(canvas, row, column, symbol, offset_tics):
     while True:
@@ -131,11 +140,19 @@ async def fly_garbage(canvas, column, garbage_frame, speed=0.2):
 async def fill_orbit_with_garbage(canvas, display_height):
     garbage = os.listdir('garbage')
     while True:
-        with open(os.path.join('garbage', choice(garbage)), "r") as garbage_file:
+        with open(os.path.join('garbage', choice(garbage)), 'r') as garbage_file:
             frame = garbage_file.read()
         garbage_coord = randint(0, display_height)
         coroutines.append(fly_garbage(canvas, column=garbage_coord, garbage_frame=frame))
-        await sleep(5)
+        await sleep(15)
+
+
+async def show_gameover(canvas, row, column):
+    while True:
+        with open('game_over_lettering.txt', 'r') as file:
+            lettering = file.read()
+        draw_frame(canvas, row, column, lettering)
+        await sleep()
 
 
 async def sleep(tics=1):
@@ -152,13 +169,16 @@ def draw(canvas, path_to_frames_dir, stars_number):
         with open(os.path.join(path_to_frames_dir, rocket_frame), 'r') as file:
             rocket_frames.append(file.read())
     display_width, display_height = canvas.getmaxyx()
+
+    global ship_width
+    global ship_height
     ship_width, ship_height = get_frame_size(rocket_frames[0])
 
-    global row_borders
-    global column_borders
     step_from_edge = 1
     max_offset_tics = 15
 
+    global row_borders
+    global column_borders
     row_borders = (step_from_edge, display_width - ship_width - step_from_edge)
     column_borders = (step_from_edge,
                       display_height - ship_height - step_from_edge)
