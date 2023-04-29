@@ -11,13 +11,16 @@ from environs import Env
 
 from explosion import explode
 from physics import update_speed
+from game_scenario import PHRASES, get_garbage_delay_tics
 from obstacles import Obstacle, show_obstacles
 from curses_tools import draw_frame, read_controls, get_frame_size
 
 TIC_TIMEOUT = 0.1
+year = 1957
 
 
-async def animate_spaceship(canvas, row, column, rocket_frames):
+async def animate_spaceship(canvas, row, column, rocket_frames,
+                            year_adding_weapons):
     row_speed, column_speed = 0, 0
     for rocket_frame in cycle(rocket_frames):
         for _ in range(2):
@@ -33,7 +36,7 @@ async def animate_spaceship(canvas, row, column, rocket_frames):
             row += row_speed
             column += column_speed
 
-            if space_pressed:
+            if year >= year_adding_weapons and space_pressed:
                 coroutines.append(fire(canvas, row, column + 2))
 
             row = min(max(row_borders), max(min(row_borders), row))
@@ -45,6 +48,10 @@ async def animate_spaceship(canvas, row, column, rocket_frames):
             for obstacle in obstacles:
                 if obstacle.has_collision(
                         row, column, ship_width, ship_height):
+                    coroutines.append(
+                        explode(canvas, row + ship_width / 2,
+                                column + ship_height / 2)
+                    )
                     coroutines.append(
                         show_gameover(canvas, row_borders[1] / 2,
                                       column_borders[1] / 3)
@@ -107,7 +114,10 @@ async def fire(canvas, start_row, start_column,
 
 
 async def fly_garbage(canvas, column, garbage_frame, speed=0.2):
-    """Animate garbage, flying from top to bottom. Сolumn position will stay same, as specified on start."""
+    """
+    Animate garbage, flying from top to bottom.
+    Сolumn position will stay same, as specified on start.
+    """
     rows_number, columns_number = canvas.getmaxyx()
 
     column = max(column, 0)
@@ -140,19 +150,43 @@ async def fly_garbage(canvas, column, garbage_frame, speed=0.2):
 async def fill_orbit_with_garbage(canvas, display_height):
     garbage = os.listdir('garbage')
     while True:
-        with open(os.path.join('garbage', choice(garbage)), 'r') as garbage_file:
+        delay_tics = get_garbage_delay_tics(year)
+        if not delay_tics:
+            await sleep(15)
+            continue
+
+        path_to_garbage_frames = os.path.join('garbage', choice(garbage))
+        with open(path_to_garbage_frames, 'r') as garbage_file:
             frame = garbage_file.read()
         garbage_coord = randint(0, display_height)
-        coroutines.append(fly_garbage(canvas, column=garbage_coord, garbage_frame=frame))
+        coroutines.append(
+            fly_garbage(canvas, column=garbage_coord, garbage_frame=frame)
+        )
+        await sleep(delay_tics)
+
+
+async def show_year(window_for_show_year):
+    while True:
+        year_information = f'{year} year\n{PHRASES.get(year, "")}'
+        draw_frame(window_for_show_year, 0, 0, year_information)
+        await sleep()
+        draw_frame(window_for_show_year, 0, 0, year_information, negative=True)
+
+
+async def spend_time():
+    global year
+    while True:
         await sleep(15)
+        year += 1
 
 
 async def show_gameover(canvas, row, column):
+    with open('game_over_lettering.txt', 'r') as file:
+        lettering = file.read()
     while True:
-        with open('game_over_lettering.txt', 'r') as file:
-            lettering = file.read()
         draw_frame(canvas, row, column, lettering)
         await sleep()
+        draw_frame(canvas, row, column, lettering, negative=True)
 
 
 async def sleep(tics=1):
@@ -160,9 +194,8 @@ async def sleep(tics=1):
         await asyncio.sleep(0)
 
 
-def draw(canvas, path_to_frames_dir, stars_number):
+def draw(canvas, path_to_frames_dir, stars_number, year_adding_weapons):
     curses.curs_set(False)
-    canvas.border()
     canvas.nodelay(True)
     rocket_frames = []
     for rocket_frame in os.listdir(path_to_frames_dir):
@@ -204,12 +237,16 @@ def draw(canvas, path_to_frames_dir, stars_number):
             canvas=canvas,
             row=row_borders[1] / 2,
             column=column_borders[1] / 3,
-            rocket_frames=rocket_frames
+            rocket_frames=rocket_frames,
+            year_adding_weapons=year_adding_weapons,
                           )
     )
     coroutines.append(fill_orbit_with_garbage(canvas, display_height))
     coroutines.append(show_obstacles(canvas, obstacles))
 
+    window_for_show_year = canvas.derwin(0, 0)
+    coroutines.append(spend_time())
+    coroutines.append(show_year(window_for_show_year))
     while True:
         for coroutine in coroutines.copy():
             try:
@@ -217,7 +254,7 @@ def draw(canvas, path_to_frames_dir, stars_number):
             except StopIteration:
                 coroutines.remove(coroutine)
                 continue
-
+        window_for_show_year.refresh()
         canvas.refresh()
         time.sleep(TIC_TIMEOUT)
 
@@ -226,6 +263,9 @@ def main():
     env = Env()
     env.read_env()
     stars_number = env.int('STARS_NUMBER', 200)
+    year_adding_weapons = env.int(
+        'YEAR_ADDING_WEAPONS_FOR_SPACESHIP', 2020
+    )
     parser = argparse.ArgumentParser(
         description='Укажите путь к директории с макетами ракеты'
     )
@@ -233,12 +273,14 @@ def main():
                         help='Путь до директории')
     args = parser.parse_args()
     curses.update_lines_cols()
-    curses.wrapper(partial(
-        draw,
-        path_to_frames_dir=args.path,
-        stars_number=stars_number
-                           )
-                   )
+    curses.wrapper(
+        partial(
+            draw,
+            path_to_frames_dir=args.path,
+            stars_number=stars_number,
+            year_adding_weapons=year_adding_weapons
+                )
+    )
 
 
 if __name__ == '__main__':
